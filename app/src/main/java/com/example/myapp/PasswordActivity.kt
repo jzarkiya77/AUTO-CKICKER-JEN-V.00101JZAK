@@ -1,8 +1,9 @@
 package com.example.myapp
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import at.favre.lib.crypto.bcrypt.BCrypt
@@ -14,31 +15,47 @@ class PasswordActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_password)
-    }
 
-    fun savePassword(context: Context, password: String) {
-        val hashed = BCrypt.withDefaults().hashToString(12, password.toCharArray())
-        val prefs = getSecurePrefs(context)
-        prefs.edit().putString("password_hash", hashed).apply()
-    }
+        val passwordInput = findViewById<EditText>(R.id.passwordInput)
+        val loginBtn = findViewById<Button>(R.id.loginBtn)
 
-    fun checkPassword(context: Context, password: String): Boolean {
-        val prefs = getSecurePrefs(context)
-        val hashedPassword = prefs.getString("password_hash", null)
-        
-        return if (hashedPassword != null) {
-            BCrypt.verifyer().verify(password.toCharArray(), hashedPassword).verified
-        } else {
-            false
+        if (!passwordExists()) {
+            savePassword("1234")
+        }
+
+        loginBtn.setOnClickListener {
+            val password = passwordInput.text.toString()
+            if (checkPassword(password)) {
+                startActivity(Intent(this, MainActivity::class.java))
+                finish()
+            } else {
+                Toast.makeText(this, "كلمة السر غلط", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    private fun getSecurePrefs(context: Context): android.content.SharedPreferences {
+    private fun passwordExists(): Boolean {
+        val prefs = getSecurePrefs()
+        return prefs.contains("password_hash")
+    }
+
+    private fun savePassword(password: String) {
+        val hashed = BCrypt.withDefaults().hashToString(12, password.toCharArray())
+        getSecurePrefs().edit().putString("password_hash", hashed).apply()
+    }
+
+    private fun checkPassword(password: String): Boolean {
+        val hashedPassword = getSecurePrefs().getString("password_hash", null)
+        return hashedPassword != null && 
+               BCrypt.verifyer().verify(password.toCharArray(), hashedPassword).verified
+    }
+
+    private fun getSecurePrefs(): android.content.SharedPreferences {
         val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         return EncryptedSharedPreferences.create(
             "secure_prefs",
             masterKeyAlias,
-            context,
+            this,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
